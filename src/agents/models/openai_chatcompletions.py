@@ -746,6 +746,10 @@ class OpenAIChatCompletionsModel(Model):
             raise TypeError(
                 f"chat.completions.create() got multiple values for keyword arguments {keys}"
             )
+        if model_settings.max_tokens is not None and ChatCmplHelpers.is_openai(self._get_client()):
+            create_kwargs["max_tokens"] = omit
+            if "max_completion_tokens" not in (model_settings.extra_args or {}):
+                create_kwargs["max_completion_tokens"] = model_settings.max_tokens
         create_kwargs.update(model_settings.extra_args or {})
 
         ret = await self._get_client().chat.completions.create(**create_kwargs)

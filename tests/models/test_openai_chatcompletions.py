@@ -1489,6 +1489,92 @@ async def test_chat_completions_requests_normalize_dictionary_agent_settings(
 
 @pytest.mark.allow_call_model_methods
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("base_url", "extra_args", "expected_key", "unexpected_key", "expected_value"),
+    [
+        (
+            "https://api.openai.com/v1",
+            None,
+            "max_completion_tokens",
+            "max_tokens",
+            256,
+        ),
+        (
+            "https://api.openai.com/v1",
+            {"max_completion_tokens": 100},
+            "max_completion_tokens",
+            "max_tokens",
+            100,
+        ),
+        (
+            "https://provider.example/v1",
+            None,
+            "max_tokens",
+            "max_completion_tokens",
+            256,
+        ),
+    ],
+    ids=["official", "official-explicit-override", "compatible-provider"],
+)
+async def test_chat_completions_max_tokens_request_parameter(
+    base_url: str,
+    extra_args: dict[str, Any] | None,
+    expected_key: str,
+    unexpected_key: str,
+    expected_value: int,
+) -> None:
+    requests: list[dict[str, Any]] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        requests.append(json.loads(request.content))
+        return httpx2.Response(200, json=_minimal_chat_completion().model_dump())
+
+    async with AsyncOpenAI(
+        api_key="test-placeholder",
+        base_url=base_url,
+        max_retries=0,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler)),
+    ) as client:
+        agent = Agent(
+            name="test",
+            model=OpenAIChatCompletionsModel(model="o4-mini", openai_client=client),
+            model_settings=ModelSettings(max_tokens=256, extra_args=extra_args),
+        )
+        await Runner.run(agent, "hi", run_config=RunConfig(tracing_disabled=True))
+
+    assert len(requests) == 1
+    assert requests[0][expected_key] == expected_value
+    assert unexpected_key not in requests[0]
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_official_duplicate_max_tokens_rejected_before_request() -> None:
+    requests: list[dict[str, Any]] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        requests.append(json.loads(request.content))
+        return httpx2.Response(200, json=_minimal_chat_completion().model_dump())
+
+    async with AsyncOpenAI(
+        api_key="test-placeholder",
+        base_url="https://api.openai.com/v1",
+        max_retries=0,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler)),
+    ) as client:
+        agent = Agent(
+            name="test",
+            model=OpenAIChatCompletionsModel(model="o4-mini", openai_client=client),
+            model_settings=ModelSettings(max_tokens=256, extra_args={"max_tokens": 128}),
+        )
+        with pytest.raises(TypeError, match="multiple values.*max_tokens"):
+            await Runner.run(agent, "hi", run_config=RunConfig(tracing_disabled=True))
+
+    assert requests == []
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
 async def test_custom_base_url_prompt_cache_key_uses_model_settings_only() -> None:
     default_kwargs = await _run_chat_completions_model_with_custom_base_url()
     explicit_kwargs = await _run_chat_completions_model_with_custom_base_url(

@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import httpx2
 import pytest
+from openai import omit
 from openai.types.chat.chat_completion import ChatCompletion, Choice as ChatCompletionChoice
 from openai.types.chat.chat_completion_chunk import (
     ChatCompletionChunk,
@@ -237,7 +238,8 @@ async def test_stream_response_forwards_dictionary_agent_model_settings(
     assert completions.kwargs["top_p"] == 1.0
     assert completions.kwargs["frequency_penalty"] == 0.0
     assert completions.kwargs["presence_penalty"] == 0.0
-    assert completions.kwargs["max_tokens"] == 64
+    assert completions.kwargs["max_completion_tokens"] == 64
+    assert completions.kwargs["max_tokens"] is omit
     assert completions.kwargs["parallel_tool_calls"] is False
     assert completions.kwargs["stream"] is True
     assert completions.kwargs["stream_options"] == {"include_usage": False}
