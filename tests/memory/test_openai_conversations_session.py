@@ -25,6 +25,7 @@ from agents import (
     function_tool,
     handoff,
     output_guardrail,
+    set_default_openai_key,
 )
 from agents.decorators import tool
 from agents.exceptions import UserError
@@ -113,6 +114,7 @@ class TestStartOpenAIConversationsSession:
     @pytest.mark.asyncio
     async def test_start_with_none_client_fallback(self):
         """Test starting a conversation session when get_default_openai_client returns None."""
+        set_default_openai_key("test_key")
         with patch(
             "agents.memory.openai_conversations_session.get_default_openai_client"
         ) as mock_get_default:
@@ -131,7 +133,7 @@ class TestStartOpenAIConversationsSession:
 
                 assert conversation_id == "fallback_client_id"
                 mock_get_default.assert_called_once()
-                mock_async_openai.assert_called_once()
+                mock_async_openai.assert_called_once_with(api_key="test_key")
                 mock_fallback_client.conversations.create.assert_called_once_with(items=[])
 
 
@@ -171,6 +173,7 @@ class TestOpenAIConversationsSessionConstructor:
 
     def test_init_with_no_args_fallback(self):
         """Test constructor with no args, should create default client."""
+        set_default_openai_key("test_key")
         with patch(
             "agents.memory.openai_conversations_session.get_default_openai_client"
         ) as mock_get_default:
@@ -187,7 +190,7 @@ class TestOpenAIConversationsSessionConstructor:
                 assert session._session_id is None
                 assert session._openai_client is mock_fallback_client
                 mock_get_default.assert_called_once()
-                mock_async_openai.assert_called_once()
+                mock_async_openai.assert_called_once_with(api_key="test_key")
 
 
 class TestOpenAIConversationsSessionLifecycle:

@@ -22,7 +22,7 @@ from openai.types.responses.response_usage import (
 )
 
 import agents._debug as _debug
-from agents import Agent, OpenAIResponsesModel, RunConfig, Runner
+from agents import Agent, OpenAIResponsesModel, RunConfig, Runner, set_default_openai_key
 from agents.items import MessageOutputItem, TResponseInputItem
 from agents.memory import (
     OpenAIResponsesCompactionSession,
@@ -366,6 +366,24 @@ class TestOpenAIResponsesCompactionSession:
             return_value=mock_client,
         ):
             assert session.client is mock_client
+
+    def test_client_uses_default_openai_key(self) -> None:
+        set_default_openai_key("test_key")
+        session = OpenAIResponsesCompactionSession(
+            session_id="test",
+            underlying_session=self.create_mock_session(),
+        )
+
+        with (
+            patch(
+                "agents.memory.openai_responses_compaction_session.get_default_openai_client",
+                return_value=None,
+            ),
+            patch("agents.memory.openai_responses_compaction_session.AsyncOpenAI") as mock_client,
+        ):
+            assert session.client is mock_client.return_value
+
+        mock_client.assert_called_once_with(api_key="test_key")
 
     def create_mock_session(self) -> MagicMock:
         mock = MagicMock(spec=Session)
